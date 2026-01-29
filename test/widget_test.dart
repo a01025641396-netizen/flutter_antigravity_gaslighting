@@ -1,30 +1,53 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:flutter_gaslighting/main.dart';
+import 'package:flutter_gaslighting/data/repository/weather_repository.dart';
+import 'package:flutter_gaslighting/data/model/weather_model.dart';
+
+class MockWeatherRepository extends Mock implements WeatherRepository {}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('App smoke test - verifies weather data loads', (
+    WidgetTester tester,
+  ) async {
+    final mockRepository = MockWeatherRepository();
+    const mockWeather = WeatherModel(
+      latitude: 37.57,
+      longitude: 126.98,
+      currentWeather: CurrentWeather(
+        temperature: 20.0,
+        windspeed: 5.0,
+        winddirection: 180,
+        weathercode: 1,
+        isDay: 1,
+        time: "2023-10-27T12:00",
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Need to handle the future to ensure it completes
+    when(
+      () => mockRepository.getWeather(),
+    ).thenAnswer((_) async => mockWeather);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          weatherRepositoryProvider.overrideWithValue(mockRepository),
+        ],
+        child: const MyApp(),
+      ),
+    );
+
+    // Check for loading indicator
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    // Wait for the future to complete
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Check for data
+    expect(find.text('20.0°C'), findsOneWidget);
+    expect(find.text('Weather App'), findsOneWidget);
   });
 }
